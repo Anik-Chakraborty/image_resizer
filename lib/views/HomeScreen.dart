@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:image_editor_plus/image_editor_plus.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +9,7 @@ import 'package:image_resizer/res/Colors.dart';
 import 'package:image_resizer/views/CompressScreen.dart';
 import 'package:image_resizer/views/DimensionScreen.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:image_editor_plus/options.dart' as o;
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -57,6 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
           buttons(context, 'Change Dimension', () {
             openImageDimension();
           }),
+          buttons(context, 'Square', () async{
+            await handelPermission();
+            Uint8List? data = await pickImage();
+            openSquareImageEditor(data);
+          }),
         ],
       ),
     );
@@ -69,6 +73,24 @@ class _HomeScreenState extends State<HomeScreen> {
         MaterialPageRoute(
           builder: (context) => ImageEditor(
             image: data, // <-- Uint8List of an image
+          ),
+        ),
+      );
+      print(editedImage.runtimeType);
+      _saveLocalImage(editedImage);
+      // File('my_image.jpg').writeAsBytes(editedImage);
+    }
+  }
+
+
+  openSquareImageEditor(data) async{
+    if(data!=null){
+      final editedImage = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImageCropper(
+            image: data, // <-- Uint8List of an image
+            availableRatios: const [o.AspectRatio(title: '1:1', ratio: 1),],
           ),
         ),
       );

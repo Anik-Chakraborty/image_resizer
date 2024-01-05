@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:image_resizer/res/Colors.dart';
-import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'dart:ui' as ui;
 import 'package:image_resizer/views/HomeScreen.dart';
 
@@ -24,6 +24,7 @@ class _DimensionScreenState extends State<DimensionScreen> {
   int simplifiedHeight = 0;
 
 
+  @override
   void initState() {
     // TODO: implement initState
     super.initState();
@@ -39,9 +40,6 @@ class _DimensionScreenState extends State<DimensionScreen> {
     final int width = frameInfo.image.width;
     final int height = frameInfo.image.height;
 
-    print(width);
-    print(height);
-
     calculateRatio(width, height);
 
   }
@@ -53,7 +51,6 @@ class _DimensionScreenState extends State<DimensionScreen> {
     simplifiedWidth = width ~/ gcdValue;
     simplifiedHeight = height ~/ gcdValue;
 
-    print('$simplifiedWidth:$simplifiedHeight');
   }
 
   int calculateGCD(int a, int b) {
@@ -96,14 +93,34 @@ class _DimensionScreenState extends State<DimensionScreen> {
                       setState(() {
                         fixedRatio = value ?? false;
                       });
+
+                      if(value!=null && value){
+                        try{
+                          int? widthCheck = int.parse(selectedWidth.text);
+                          int? heightCheck = int.parse(selectedHeight.text);
+
+                          if(widthCheck != 0 && widthCheck != null){
+                            int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
+                            selectedHeight.text = height.toString();
+                          }
+                          else if(heightCheck !=0 && heightCheck !=null){
+                            int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
+                            selectedWidth.text = width.toString();
+                          }
+                        }
+                        catch(error){
+                          debugPrint(error.toString());
+                        }
+                      }
+
                     },
                   ),
                   const Text('Fix Aspect Ratio')
                 ],),
               ),
-              const SizedBox(height: 20,),
+              const SizedBox(height: 10,),
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -114,26 +131,33 @@ class _DimensionScreenState extends State<DimensionScreen> {
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly
                         ],
+                        keyboardType: TextInputType.phone,
                         onChanged: (value){
                           if(fixedRatio){
-                            selectedHeight.text = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toString();
+                            int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
+                            selectedHeight.text = height.toString();
                           }
                         },
                         decoration: InputDecoration(
                           hintText: 'Select Width',
+                          border: const OutlineInputBorder(
+                              borderSide: BorderSide(color: primaryColor,width: 2)
+                          ),
                           suffixIcon: IconButton(
                             onPressed: () {
                               showDialog(context: context, builder: (context) {
                                 return AlertDialog(
+                                  backgroundColor: primaryColor,
                                   content: Column(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      SizeMenu('240', selectedWidth),
-                                      SizeMenu('360', selectedWidth),
-                                      SizeMenu('480', selectedWidth),
-                                      SizeMenu('720', selectedWidth),
-                                      SizeMenu('1080', selectedWidth),
-                                      SizeMenu('1440', selectedWidth),
-                                      SizeMenu('2160', selectedWidth)
+                                      SizeMenu('240', selectedWidth, fixedRatio, true),
+                                      SizeMenu('360', selectedWidth, fixedRatio, true),
+                                      SizeMenu('480', selectedWidth, fixedRatio, true),
+                                      SizeMenu('720', selectedWidth, fixedRatio, true),
+                                      SizeMenu('1080', selectedWidth, fixedRatio, true),
+                                      SizeMenu('1440', selectedWidth, fixedRatio, true),
+                                      SizeMenu('2160', selectedWidth, fixedRatio,true)
                                     ],
                                   ),
                                 );
@@ -148,29 +172,36 @@ class _DimensionScreenState extends State<DimensionScreen> {
                       width: MediaQuery.of(context).size.width*0.4,
                       child: TextField(
                         controller: selectedHeight,
+                        keyboardType: TextInputType.phone,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly
                         ],
                         onChanged: (value){
                           if(fixedRatio){
-                            selectedWidth.text = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toString();
+                            int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
+                            selectedWidth.text = width.toString();
                           }
                         },
                         decoration: InputDecoration(
                             hintText: 'Select Height',
+                            border: const OutlineInputBorder(
+                              borderSide: BorderSide(color: primaryColor,width: 2)
+                            ),
                             suffixIcon: IconButton(
                               onPressed: () {
                                 showDialog(context: context, builder: (context) {
                                   return AlertDialog(
+                                    backgroundColor: primaryColor,
                                     content: Column(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        SizeMenu('240', selectedHeight),
-                                        SizeMenu('360', selectedHeight),
-                                        SizeMenu('480', selectedHeight),
-                                        SizeMenu('720', selectedHeight),
-                                        SizeMenu('1080', selectedHeight),
-                                        SizeMenu('1440', selectedHeight),
-                                        SizeMenu('2160', selectedHeight)
+                                        SizeMenu('240', selectedHeight, fixedRatio, false),
+                                        SizeMenu('360', selectedHeight, fixedRatio, false),
+                                        SizeMenu('480', selectedHeight, fixedRatio, false),
+                                        SizeMenu('720', selectedHeight, fixedRatio, false),
+                                        SizeMenu('1080', selectedHeight, fixedRatio, false),
+                                        SizeMenu('1440', selectedHeight, fixedRatio, false),
+                                        SizeMenu('2160', selectedHeight, fixedRatio, false)
                                       ],
                                     ),
                                   );
@@ -184,9 +215,16 @@ class _DimensionScreenState extends State<DimensionScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 30,),
               buttons(context, 'Save', () async{
-                print(simplifiedHeight);
-                print(simplifiedWidth);
+                if(selectedHeight.text.isNotEmpty && selectedWidth.text.isNotEmpty){
+                  img.Image image = img.decodeImage(widget.imageFile.readAsBytesSync())!;
+
+                  img.Image thumbnail = img.copyResize(image, width: int.parse(selectedWidth.text), height: int.parse(selectedHeight.text));
+
+                  await ImageGallerySaver.saveImage(img.encodePng(thumbnail));
+                  Navigator.pop(context);
+                }
               }),
 
             ],
@@ -195,13 +233,27 @@ class _DimensionScreenState extends State<DimensionScreen> {
       ),
     );
   }
+  SizeMenu(String txt, TextEditingController controller, bool ratio, bool width){
+    return InkWell(
+      onTap: (){
+        controller.text = txt;
+        if(ratio){
+          if(width){
+            int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
+            selectedHeight.text = height.toString();
+          }
+          else{
+            int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
+            selectedWidth.text = width.toString();
+          }
+        }
+        Navigator.pop(context);
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Text(txt, style: const TextStyle(color: Colors.white, fontSize: 20),),
+      ),
+    );
+  }
 }
 
-SizeMenu(String txt, TextEditingController controller){
-  return InkWell(
-    onTap: (){
-      controller.text = txt;
-    },
-    child: Text(txt),
-  );
-}
