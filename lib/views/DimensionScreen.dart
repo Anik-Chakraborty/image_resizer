@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_resizer/controllers/saveImage.dart';
 import 'package:image_resizer/res/Colors.dart';
 import 'package:image/image.dart' as img;
 import 'dart:ui' as ui;
-import 'package:image_resizer/views/HomeScreen.dart';
+import 'package:image_resizer/views/custom_widgets/custom_buttons.dart';
 
 class DimensionScreen extends StatefulWidget{
   final imageFile;
@@ -76,9 +76,10 @@ class _DimensionScreenState extends State<DimensionScreen> {
                 margin: const EdgeInsets.all(30),
                 child: Image.file(
                   widget.imageFile, // Use the picked image file
-                  width: MediaQuery.of(context).size.width * 0.4,
-                  height: MediaQuery.of(context).size.width * 0.4 + 100,
-                  fit: BoxFit.cover,
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  height: MediaQuery.of(context).size.width * 0.8,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
                 ),
               ),
               const SizedBox(height: 20,),
@@ -222,8 +223,7 @@ class _DimensionScreenState extends State<DimensionScreen> {
 
                   img.Image thumbnail = img.copyResize(image, width: int.parse(selectedWidth.text), height: int.parse(selectedHeight.text));
 
-                  await ImageGallerySaver.saveImage(img.encodePng(thumbnail));
-                  Navigator.pop(context);
+                  await saveImage(img.encodePng(thumbnail), context);
                 }
               }),
 

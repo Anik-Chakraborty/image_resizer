@@ -1,11 +1,9 @@
 import 'dart:typed_data';
-
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_resizer/controllers/saveImage.dart';
 import 'package:image_resizer/res/Colors.dart';
-import 'package:image_resizer/views/HomeScreen.dart';
+import 'package:image_resizer/views/custom_widgets/custom_buttons.dart';
 
 class CompressScreen extends StatefulWidget{
   final imageFile;
@@ -17,9 +15,7 @@ class CompressScreen extends StatefulWidget{
 
 class _CompressScreenState extends State<CompressScreen> {
   String originalSize = '';
-  String compressedSize = '';
-  double compressPercentage = 50, imageSize =0;
-  bool compressed = false;
+  double compressQuality = 50, imageSize =0;
 
   @override
   void initState() {
@@ -34,7 +30,6 @@ class _CompressScreenState extends State<CompressScreen> {
 
     setState(() {
       originalSize = imageSize.toStringAsFixed(2);
-      compressedSize = ((imageSize * compressPercentage)/100).toStringAsFixed(2);
     });
   }
 
@@ -52,36 +47,32 @@ class _CompressScreenState extends State<CompressScreen> {
                 margin: const EdgeInsets.all(30),
                 child: Image.file(
                   widget.imageFile, // Use the picked image file
-                  width: MediaQuery.of(context).size.width * 0.4,
-                  height: MediaQuery.of(context).size.width * 0.4 + 100,
-                  fit: BoxFit.cover,
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  height: MediaQuery.of(context).size.width * 0.8,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
                 ),
               ),
             ],
           ),
 
-          const Text('File Name : '),
+          Text('File Name : ${widget.imageFile.path.split('/').last}', overflow: TextOverflow.ellipsis,),
           const SizedBox(height: 10,),
           Text('Original Size : $originalSize Kb'),
           const SizedBox(height: 20,),
-          Visibility(
-            visible: true,
-              child: Text('Compressed Size : $compressedSize Kb')),
-          Visibility(
-              visible: compressed,
-              child: const SizedBox(height: 20,)),
+          Text('Compressed Quality : ${compressQuality.round()}'),
           Slider(
-            value: compressPercentage,
+            value: compressQuality,
             max: 100,
             divisions: 9,
             min: 10,
             activeColor: primaryColor,
             thumbColor: primaryColor,
-            label: compressPercentage.round().toString(),
+            label: compressQuality.round().toString(),
             onChanged: (double value) {
               setState(() {
-                compressPercentage = value;
-                compressedSize = ((imageSize * compressPercentage)/100).toStringAsFixed(2);
+                compressQuality = value;
+                // compressedSize = ((imageSize * compressQuality)/100).toStringAsFixed(2);
               });
             },
           ),
@@ -89,17 +80,10 @@ class _CompressScreenState extends State<CompressScreen> {
           buttons(context, 'Compress', () async{
             var result = await FlutterImageCompress.compressWithFile(
               widget.imageFile.absolute.path,
-              quality: compressPercentage.toInt(),
+              quality: compressQuality.toInt(),
             );
             if(result!=null){
-              print((result.lengthInBytes / 1024));
-              final data = await ImageGallerySaver.saveImage(await widget.imageFile.readAsBytes(), quality: compressPercentage.toInt());
-
-              print(data.runtimeType);
-              setState(() {
-                compressed = true;
-                // compressedSize = ( data. / 1024).toStringAsFixed(2);
-              });
+              await saveImage(await widget.imageFile.readAsBytes(), context);
             }
           }),
         ],
