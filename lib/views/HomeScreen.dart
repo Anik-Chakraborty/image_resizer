@@ -8,6 +8,7 @@ import 'package:image_resizer/controllers/saveImage.dart';
 import 'package:image_resizer/views/CompressScreen.dart';
 import 'package:image_resizer/views/DimensionScreen.dart';
 import 'package:image_resizer/views/SavedImagesScreen.dart';
+import 'package:image_resizer/views/SquareScreen.dart';
 import 'package:image_resizer/views/custom_widgets/custom_buttons.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_editor_plus/options.dart' as o;
@@ -68,8 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }),
             buttons(context, 'Square', () async {
               await handelPermission();
-              Uint8List? data = await pickImage();
-              openSquareImageEditor(data);
+              openSquareImageEditor();
             }),
             buttons(context, 'Saved Images', () async {
               Navigator.push(
@@ -100,21 +100,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  openSquareImageEditor(data) async {
-    if (data != null) {
-      final editedImage = await Navigator.push(
+  openSquareImageEditor() async {
+    final ImagePicker picker = ImagePicker();
+    // Pick an image.
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ImageCropper(
-            image: data, // <-- Uint8List of an image
-            availableRatios: const [
-              o.AspectRatio(title: '1:1', ratio: 1),
-            ],
+          builder: (context) => SquareScreen(
+            imageFile: File(image.path), // <-- Uint8List of an image
           ),
         ),
       );
-      print(editedImage.runtimeType);
-      saveImage(editedImage, context);
     }
   }
 
