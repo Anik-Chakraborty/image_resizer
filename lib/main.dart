@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_resizer/views/HomeScreen.dart';
 import 'package:image_resizer/views/PurchaseScreen.dart';
 
 void main() {

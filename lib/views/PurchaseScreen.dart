@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:image_resizer/res/Colors.dart';
 import 'package:image_resizer/views/HomeScreen.dart';
 import 'package:image_resizer/views/custom_widgets/custom_buttons.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:platform/platform.dart';
 
 
 class PurchaseScreen extends StatefulWidget {
@@ -33,18 +35,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
     'assets/intro_images/s10.png',
   ];
 
-  bool flag = true;
+  bool monthSelected = true;
 
-  /// Products for sale
-  List<ProductDetails> _products = [];
 
 
   /// The In App Purchase plugin
   InAppPurchase _iap = InAppPurchase.instance;
 
-
-  /// Past purchases
-  List<PurchaseDetails> _purchases = [];
 
 
   /// Consumable credits the user can buy
@@ -65,49 +62,53 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
     if (available) {
 
-      await _getProducts();
+      // Initialize in_app_purchase
+      // _iap.enablePendingPurchases();
+      // Add listeners
+      _iap.purchaseStream.listen((data) {
+        // Handle purchase updates
+      });
 
-      // Verify and deliver a purchase with your own business logic
-      _verifyPurchase();
 
     }
   }
 
 
+  Future<void> _buyProduct(String productId) async {
+    final PurchaseParam purchaseParam = PurchaseParam(
+      productDetails: await _getProductDetails(productId),
+      applicationUserName: null, // You can use an identifier for the user here
+    );
 
-  /// Get all products available for sale
-  Future<void> _getProducts() async {
-    Set<String> ids = Set.from([testID, 'test_a']);
-    ProductDetailsResponse response = await _iap.queryProductDetails(ids);
+    try {
+      // Start the purchase process
+      bool state = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
 
-    setState(() {
-      _products = response.productDetails;
-    });
-  }
+      if(state){
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(),
+            ));
+      }
 
-
-  /// Returns purchase of specific product ID
-  PurchaseDetails? _hasPurchased(String productID) {
-    return _purchases.firstWhere( (purchase) => purchase.productID == productID);
-  }
-
-  /// Your own business logic to setup a consumable
-  void _verifyPurchase() {
-    PurchaseDetails? purchase = _hasPurchased(testID);
-
-    // TODO serverside verification & record consumable in the database
-
-    if (purchase != null && purchase.status == PurchaseStatus.purchased) {
-      flag = true;
+    } catch (e) {
+      // Handle the purchase error
+      debugPrint('Error purchasing: $e');
     }
   }
 
-  /// Purchase a product
-  void _buyProduct(ProductDetails prod) {
-    final PurchaseParam purchaseParam = PurchaseParam(productDetails: prod);
-    // _iap.buyNonConsumable(purchaseParam: purchaseParam);
-    _iap.buyConsumable(purchaseParam: purchaseParam, autoConsume: false);
+  Future<ProductDetails> _getProductDetails(String productId) async {
+    final Set<String> ids = {productId};
+    final ProductDetailsResponse response =
+    await _iap.queryProductDetails(ids);
+    if (response.notFoundIDs.isNotEmpty) {
+      throw Exception('Product not found: ${response.notFoundIDs.first}');
+    }
+    return response.productDetails.first;
   }
+
+
 
 
 
@@ -129,13 +130,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
               height: 20,
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.25,
+              height: MediaQuery.of(context).size.height * 0.2,
               width: MediaQuery.of(context).size.width,
               child: CarouselSlider(
                   items: items_first
                       .map((e) => Image(
                             image: AssetImage(e),
-                            width: MediaQuery.of(context).size.width * 0.25,
+                            width: MediaQuery.of(context).size.width * 0.2,
                             fit: BoxFit.cover,
                           ))
                       .toList(),
@@ -159,13 +160,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
               height: 20,
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.25,
+              height: MediaQuery.of(context).size.height * 0.2,
               width: MediaQuery.of(context).size.width,
               child: CarouselSlider(
                   items: items_second
                       .map((e) => Image(
                             image: AssetImage(e),
-                            width: MediaQuery.of(context).size.width * 0.25,
+                            width: MediaQuery.of(context).size.width * 0.2,
                             fit: BoxFit.cover,
                           ))
                       .toList(),
@@ -186,41 +187,128 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                   )),
             ),
             const SizedBox(
-              height: 20,
+              height: 15,
             ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                '\u2713 No Ads',
-                style: TextStyle(color: Colors.white),
+
+            const Row(mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  '\u2713 No Ads',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                '\u2713 Square Crop',
-                style: TextStyle(color: Colors.white),
+              SizedBox(
+                height: 15,
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                '\u2713 Change Dimension',
-                style: TextStyle(color: Colors.white),
+              Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  '\u2713 Rotate, Flip Image',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                '\u2713 Rotate, Flip Image',
-                style: TextStyle(color: Colors.white),
+            ],),
+            const Row(mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    '\u2713 Change Dimension',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                SizedBox(
+                  height: 20,
+                ),
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    '\u2713 Square Crop',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],),
+
+            Visibility(visible: LocalPlatform().isIOS,child: InkWell(
+              onTap: () {
+                _buyProduct('com.example.app.trial');
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  'Continue 3 days free trail',
+                  style: TextStyle(color: Colors.white, decoration: TextDecoration.underline, decorationColor: Colors.white),
+                ),
               ),
-            ),
+            ),),
             const SizedBox(
-              height: 20,
+              height: 15,
             ),
-            buttons(context, 'Purchase', () {
-              if (flag) {
+
+            Visibility(visible: LocalPlatform().isIOS,child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      monthSelected = true;
+                    });
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 85,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: monthSelected ? primaryColor : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: primaryColor, width: 1)
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Per month' , style: TextStyle(color: monthSelected ? Colors.white : primaryColor, fontSize: 15)),
+                        const SizedBox(height: 10,),
+                        Text('\$11.99', style: TextStyle(color: monthSelected ? Colors.white : primaryColor, fontSize: 20, fontWeight: FontWeight.bold))
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: 20,),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      monthSelected = false;
+                    });
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 85,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: monthSelected ? Colors.white  : primaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: primaryColor, width: 1)
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Per year' , style: TextStyle(color: !monthSelected ? Colors.white : primaryColor, fontSize: 15)),
+                        const SizedBox(height: 10,),
+                        Text('\$59.99', style: TextStyle(color: !monthSelected ? Colors.white : primaryColor, fontSize: 20, fontWeight: FontWeight.bold))
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),),
+
+            const SizedBox(
+              height: 15,
+            ),
+            buttons(context, LocalPlatform().isAndroid ? 'Next' : 'Purchase', () {
+              if (LocalPlatform().isAndroid) {
                 Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -228,8 +316,12 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                     ));
               }
               else{
-                //show in app purchase
-                _buyProduct(_products[0]);
+                if(monthSelected){
+                  _buyProduct('com.example.app.monthly');
+                }
+                else{
+                  _buyProduct('com.example.app.yearly');
+                }
               }
             }),
             const SizedBox(
