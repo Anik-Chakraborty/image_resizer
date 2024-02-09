@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:image_resizer/controllers/saveImage.dart';
 import 'package:image_resizer/res/Colors.dart';
 import 'package:image/image.dart' as img;
-import 'dart:ui' as ui;
 import 'package:image_resizer/views/custom_widgets/custom_buttons.dart';
+import 'dart:ui' as ui;
+import 'package:photo_view/photo_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DimensionScreen extends StatefulWidget{
   final imageFile;
@@ -19,29 +23,78 @@ class _DimensionScreenState extends State<DimensionScreen> {
   TextEditingController selectedHeight = TextEditingController();
   TextEditingController selectedWidth = TextEditingController();
 
+  GlobalKey _containerKey = GlobalKey();
+
   bool fixedRatio = true;
   int simplifiedWidth = 0;
   int simplifiedHeight = 0;
+
+  double artBoardHeight = 1024;
+  double artBoardWidth = 1024;
+
+  Color selectedColor = Colors.grey;
+
+  PhotoViewController photoViewController = PhotoViewController();
 
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    getOriginalDimension();
+    getSelectedDimension();
   }
 
-  getOriginalDimension() async{
+  getSelectedDimension() async{
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    final data = await widget.imageFile.readAsBytes();
-    final ui.Codec codec = await ui.instantiateImageCodec(data);
+    setState(() {
+      selectedHeight.text =  (prefs.getInt('artBoardHeight') ?? 1024).toString();
+      selectedWidth.text =  (prefs.getInt('artBoardWidth') ?? 1024).toString();
+    });
 
-    final ui.FrameInfo frameInfo = await codec.getNextFrame();
-    final int width = frameInfo.image.width;
-    final int height = frameInfo.image.height;
+    if(fixedRatio){
+      try{
+        calculateRatio(int.parse(selectedWidth.text.trim()), int.parse(selectedHeight.text.trim()));
+      }
+      catch(error){
+        debugPrint(error.toString());
+      }
+    }
 
-    calculateRatio(width, height);
+    changeArtBoardDimension();
 
+  }
+
+  changeArtBoardDimension(){
+
+    if(selectedHeight.text.isNotEmpty && selectedWidth.text.isNotEmpty){
+
+      double maxSize = MediaQuery.of(context).size.width * 0.8;
+
+      if(double.parse(selectedWidth.text) == double.parse(selectedHeight.text)){
+        artBoardHeight = maxSize;
+        artBoardWidth = maxSize;
+      }
+      else if (double.parse(selectedWidth.text) > double.parse(selectedHeight.text)){
+        artBoardWidth = maxSize;
+        artBoardHeight = double.parse(selectedHeight.text) / (double.parse(selectedWidth.text)/maxSize);
+      }
+      else{
+        artBoardHeight = maxSize;
+        artBoardWidth = double.parse(selectedWidth.text) / (double.parse(selectedHeight.text)/maxSize);
+      }
+
+    }
+
+    setState(() {});
+
+  }
+
+  saveArtBoardDimension() async{
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    prefs.setInt('artBoardHeight', int.parse(selectedHeight.text.trim()));
+    prefs.setInt('artBoardWidth', int.parse(selectedWidth.text.trim()));
   }
 
   calculateRatio(int width, int height) {
@@ -62,182 +115,253 @@ class _DimensionScreenState extends State<DimensionScreen> {
     return a;
   }
 
+  void showColorPicker() {
+    showDialog(context: context, builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text("Pick a color"),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: selectedColor,
+            paletteType: PaletteType.hueWheel,
+            onColorChanged: (value) {
+              setState(() {
+                selectedColor = value;
+              });
+            },
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
-      body: SingleChildScrollView(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                margin: const EdgeInsets.all(30),
-                child: Image.file(
-                  widget.imageFile, // Use the picked image file
-                  width: MediaQuery.of(context).size.width * 0.8,
-                  height: MediaQuery.of(context).size.width * 0.8,
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                ),
-              ),
-              const SizedBox(height: 20,),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(children: [
-                  Checkbox(
-                    activeColor: primaryColor,
-                    checkColor: Colors.white,
-                    value: fixedRatio,
-                    onChanged: (value) {
-                      setState(() {
-                        fixedRatio = value ?? false;
-                      });
-
-                      if(value!=null && value){
-                        try{
-                          int? widthCheck = int.parse(selectedWidth.text);
-                          int? heightCheck = int.parse(selectedHeight.text);
-
-                          if(widthCheck != 0 && widthCheck != null){
-                            int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
-                            selectedHeight.text = height.toString();
-                          }
-                          else if(heightCheck !=0 && heightCheck !=null){
-                            int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
-                            selectedWidth.text = width.toString();
-                          }
-                        }
-                        catch(error){
-                          debugPrint(error.toString());
-                        }
-                      }
-
-                    },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height -40,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20,),
+                RepaintBoundary(
+                  key: _containerKey,
+                  child: ClipRect(
+                    child: SizedBox(
+                      width: artBoardWidth,
+                      height: artBoardHeight,
+                      child: PhotoView(
+                        backgroundDecoration: BoxDecoration(
+                          color: selectedColor,
+                        ),
+                        enablePanAlways: true,
+                        disableGestures: false,
+                        enableRotation: true,
+                        controller: photoViewController,
+                        imageProvider: FileImage(widget.imageFile),
+                      ),
+                    ),
                   ),
-                  const Text('Fix Aspect Ratio')
-                ],),
-              ),
-              const SizedBox(height: 10,),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    SizedBox(
-                      width: MediaQuery.of(context).size.width*0.4,
-                      child: TextField(
-                        controller: selectedWidth,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        keyboardType: TextInputType.phone,
-                        onChanged: (value){
-                          if(fixedRatio){
-                            int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
-                            selectedHeight.text = height.toString();
-                          }
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Select Width',
-                          border: const OutlineInputBorder(
-                              borderSide: BorderSide(color: primaryColor,width: 2)
-                          ),
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              showDialog(context: context, builder: (context) {
-                                return AlertDialog(
-                                  backgroundColor: primaryColor,
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizeMenu('240', selectedWidth, fixedRatio, true),
-                                      SizeMenu('360', selectedWidth, fixedRatio, true),
-                                      SizeMenu('480', selectedWidth, fixedRatio, true),
-                                      SizeMenu('720', selectedWidth, fixedRatio, true),
-                                      SizeMenu('1080', selectedWidth, fixedRatio, true),
-                                      SizeMenu('1440', selectedWidth, fixedRatio, true),
-                                      SizeMenu('2160', selectedWidth, fixedRatio,true)
-                                    ],
-                                  ),
-                                );
-                              },);
-                            },
-                            icon: const Icon(Icons.expand_more_outlined),
-                          )
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: MediaQuery.of(context).size.width*0.4,
-                      child: TextField(
-                        controller: selectedHeight,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        onChanged: (value){
-                          if(fixedRatio){
-                            int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
-                            selectedWidth.text = width.toString();
-                          }
-                        },
-                        decoration: InputDecoration(
-                            hintText: 'Select Height',
-                            border: const OutlineInputBorder(
-                              borderSide: BorderSide(color: primaryColor,width: 2)
-                            ),
-                            suffixIcon: IconButton(
-                              onPressed: () {
-                                showDialog(context: context, builder: (context) {
-                                  return AlertDialog(
-                                    backgroundColor: primaryColor,
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizeMenu('240', selectedHeight, fixedRatio, false),
-                                        SizeMenu('360', selectedHeight, fixedRatio, false),
-                                        SizeMenu('480', selectedHeight, fixedRatio, false),
-                                        SizeMenu('720', selectedHeight, fixedRatio, false),
-                                        SizeMenu('1080', selectedHeight, fixedRatio, false),
-                                        SizeMenu('1440', selectedHeight, fixedRatio, false),
-                                        SizeMenu('2160', selectedHeight, fixedRatio, false)
-                                      ],
-                                    ),
-                                  );
-                                },);
-                              },
-                              icon: const Icon(Icons.expand_more_outlined),
-                            )
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-              const SizedBox(height: 30,),
-              buttons(context, 'Save', () async{
-                if(selectedHeight.text.isNotEmpty && selectedWidth.text.isNotEmpty){
-                  img.Image image = img.decodeImage(widget.imageFile.readAsBytesSync())!;
+                const Expanded(child: SizedBox(),),
+                const SizedBox(height: 15,),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(children: [
+                    Checkbox(
+                      activeColor: primaryColor,
+                      checkColor: Colors.white,
+                      value: fixedRatio,
+                      onChanged: (value) {
+                        setState(() {
+                          fixedRatio = value ?? false;
+                        });
 
-                  img.Image thumbnail = img.copyResize(image, width: int.parse(selectedWidth.text), height: int.parse(selectedHeight.text));
+                        if(value!=null && value){
+                          try{
+                            calculateRatio(int.parse(selectedWidth.text.trim()), int.parse(selectedHeight.text.trim()));
+                          }
+                          catch(error){
+                            debugPrint(error.toString());
+                          }
+                        }
 
-                  await saveImage(img.encodePng(thumbnail), context);
-                }
-              }),
+                      },
+                    ),
+                    const Text('Fix Aspect Ratio'),
+                    const Expanded(child: SizedBox(),),
+                    InkWell(
+                      onTap: () {
+                        showColorPicker();
+                      },
+                      child:  Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: selectedColor
+                        ),
+                      ),
+                    )
+                  ],),
+                ),
+                const SizedBox(height: 10,),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width*0.4,
+                        child: TextField(
+                          controller: selectedWidth,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          keyboardType: TextInputType.phone,
+                          onChanged: (value){
+                            if(fixedRatio && selectedWidth.text.isNotEmpty){
+                              int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
+                              selectedHeight.text = height.toString();
+                            }
+                          },
+                          onTapOutside: (event) {
+                            changeArtBoardDimension();
+                            saveArtBoardDimension();
+                          },
+                          onEditingComplete: () {
+                            changeArtBoardDimension();
+                            saveArtBoardDimension();
+                          },
+                          decoration: InputDecoration(
+                              labelText: 'Select Width',
+                              border: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: primaryColor,width: 2)
+                              ),
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  showDialog(context: context, builder: (context) {
+                                    return AlertDialog(
+                                      backgroundColor: primaryColor,
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizeMenu('240', selectedWidth, true),
+                                          SizeMenu('360', selectedWidth, true),
+                                          SizeMenu('480', selectedWidth, true),
+                                          SizeMenu('720', selectedWidth, true),
+                                          SizeMenu('1080', selectedWidth, true),
+                                          SizeMenu('1440', selectedWidth, true),
+                                          SizeMenu('2160', selectedWidth,true)
+                                        ],
+                                      ),
+                                    );
+                                  },);
+                                },
+                                icon: const Icon(Icons.expand_more_outlined),
+                              )
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width*0.4,
+                        child: TextField(
+                          controller: selectedHeight,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          onChanged: (value){
+                            if(fixedRatio && selectedHeight.text.isNotEmpty){
+                              int width = ((int.parse(selectedHeight.text.trim()) / simplifiedHeight) * simplifiedWidth).toInt();
+                              selectedWidth.text = width.toString();
+                            }
 
-            ],
+                          },
+                          onTapOutside: (event) {
+                            changeArtBoardDimension();
+                            saveArtBoardDimension();
+                          },
+                          onEditingComplete: () {
+                            changeArtBoardDimension();
+                            saveArtBoardDimension();
+                          },
+                          decoration: InputDecoration(
+                              labelText: 'Select Height',
+                              floatingLabelBehavior: FloatingLabelBehavior.always,
+                              border: const OutlineInputBorder(
+                                  borderSide: BorderSide(color: primaryColor,width: 2)
+                              ),
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  showDialog(context: context, builder: (context) {
+                                    return AlertDialog(
+                                      backgroundColor: primaryColor,
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizeMenu('240', selectedHeight, false),
+                                          SizeMenu('360', selectedHeight, false),
+                                          SizeMenu('480', selectedHeight, false),
+                                          SizeMenu('720', selectedHeight, false),
+                                          SizeMenu('1080', selectedHeight, false),
+                                          SizeMenu('1440', selectedHeight, false),
+                                          SizeMenu('2160', selectedHeight, false)
+                                        ],
+                                      ),
+                                    );
+                                  },);
+                                },
+                                icon: const Icon(Icons.expand_more_outlined),
+                              )
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30,),
+                buttons(context, 'Save', () async{
+
+                  changeArtBoardDimension();
+                  saveArtBoardDimension();
+
+                  if(selectedHeight.text.isNotEmpty && selectedWidth.text.isNotEmpty){
+
+                    RenderRepaintBoundary boundary = _containerKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+                    ui.Image boundaryImage = await boundary.toImage();
+                    ByteData? byteData = await boundaryImage.toByteData(format: ui.ImageByteFormat.png);
+
+                    if(byteData != null){
+                      Uint8List captureImage = byteData.buffer.asUint8List();
+
+                      img.Image image = img.decodeImage(captureImage)!;
+
+                      img.Image thumbnail = img.copyResize(image, width: int.parse(selectedWidth.text), height: int.parse(selectedHeight.text));
+
+                      await saveImage(img.encodePng(thumbnail), context);
+                    }
+                  }
+                })
+
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-  SizeMenu(String txt, TextEditingController controller, bool ratio, bool width){
+
+  SizeMenu(String txt, TextEditingController controller, bool width){
     return InkWell(
       onTap: (){
         controller.text = txt;
-        if(ratio){
+        if(fixedRatio){
+
           if(width){
             int height = ((int.parse(selectedWidth.text) / simplifiedWidth) * simplifiedHeight).toInt();
             selectedHeight.text = height.toString();
@@ -246,8 +370,13 @@ class _DimensionScreenState extends State<DimensionScreen> {
             int width = ((int.parse(selectedHeight.text) / simplifiedHeight) * simplifiedWidth).toInt();
             selectedWidth.text = width.toString();
           }
+
         }
+
         Navigator.pop(context);
+
+        changeArtBoardDimension();
+        saveArtBoardDimension();
       },
       child: Padding(
         padding: const EdgeInsets.all(8.0),
