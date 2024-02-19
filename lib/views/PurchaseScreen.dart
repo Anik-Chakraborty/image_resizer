@@ -40,7 +40,8 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
 
   /// The In App Purchase plugin
-  InAppPurchase _iap = InAppPurchase.instance;
+  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+
 
 
 
@@ -49,59 +50,35 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 
   @override
   void initState() {
-    _initialize();
     super.initState();
+
+    _initializeInAppPurchase();
+    _listenForPurchaseUpdated();
   }
 
+  List<ProductDetails> _products = [];
 
-  /// Initialize data
-  void _initialize() async {
-
-    // Check availability of In App Purchases
-    available = await _iap.isAvailable();
-
-    if (available) {
-
-      // Initialize in_app_purchase
-      // _iap.enablePendingPurchases();
-      // Add listeners
-      _iap.purchaseStream.listen((data) {
-        // Handle purchase updates
+  Future<void> _initializeInAppPurchase() async {
+    final ProductDetailsResponse response =
+    await _inAppPurchase.queryProductDetails(<String>{'com.example.app.trial', 'com.example.app.monthly', 'com.example.app.yearly'});
+    if (response.productDetails.isNotEmpty) {
+      setState(() {
+        _products = response.productDetails;
       });
-
-
     }
   }
 
 
   Future<void> _buyProduct(String productId) async {
-    final PurchaseParam purchaseParam = PurchaseParam(
-      productDetails: await _getProductDetails(productId),
-      applicationUserName: null, // You can use an identifier for the user here
-    );
+    ProductDetails productDetails = await _getProductDetails(productId);
+    await _inAppPurchase.buyConsumable(purchaseParam: PurchaseParam(productDetails: productDetails, applicationUserName: ''), autoConsume: true);
 
-    try {
-      // Start the purchase process
-      bool state = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-
-      if(state){
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(),
-            ));
-      }
-
-    } catch (e) {
-      // Handle the purchase error
-      debugPrint('Error purchasing: $e');
-    }
   }
 
   Future<ProductDetails> _getProductDetails(String productId) async {
     final Set<String> ids = {productId};
     final ProductDetailsResponse response =
-    await _iap.queryProductDetails(ids);
+    await _inAppPurchase.queryProductDetails(ids);
     if (response.notFoundIDs.isNotEmpty) {
       throw Exception('Product not found: ${response.notFoundIDs.first}');
     }
@@ -109,6 +86,32 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
   }
 
 
+
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
+
+  void _listenForPurchaseUpdated() {
+    _subscription = _inAppPurchase.purchaseStream.listen((List<PurchaseDetails> purchaseDetailsList) {
+      purchaseDetailsList.forEach((PurchaseDetails purchaseDetails) async {
+        if (purchaseDetails.status == PurchaseStatus.purchased) {
+          // Handle the purchase
+
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(),
+              ));
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+
+    _subscription?.cancel();
+  }
 
 
 
